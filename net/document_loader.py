@@ -33,16 +33,7 @@ def load_and_split_documents(knowledge_base_dir: str, chunk_size: int, chunk_ove
     # For more control, you could iterate and use specific loaders.
     
     all_documents = []
-    # A more robust DirectoryLoader setup:
-    doc_loader = DirectoryLoader(
-        knowledge_base_dir,
-        glob="**/*", # Load all files, specific loaders will handle them
-        use_multithreading=True,
-        show_progress=True,
-        silent_errors=True, # Important to skip files that can't be loaded
-        # loader_cls=None, # Let it infer or provide specific loaders
-    )
-    
+
     # Manually specify how to load which files for more control
     # This part is a bit tricky with DirectoryLoader's default behavior.
     # A simpler approach for this example: load known types explicitly.

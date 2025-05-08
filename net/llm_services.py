@@ -8,6 +8,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models.chat_models import BaseChatModel
 
+from fastapi import HTTPException
+from .config import AppSettings
+from .config import LLMProviderEnum
 
 class BaseLLMService(ABC):
     """Abstract base class for LLM and Embedding services."""

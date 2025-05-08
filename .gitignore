@@ -172,3 +172,7 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Application-specific stuff
+knowledge_base_data/
+vector_db_faiss_modular/

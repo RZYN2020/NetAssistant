@@ -1,7 +1,8 @@
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from langchain_core.language_models.chat_models import BaseChatModel
-
+from langchain_community.vectorstores import FAISS
+from .config import settings
 
 def build_rag_chain(
     llm: BaseChatModel,
@@ -9,16 +10,9 @@ def build_rag_chain(
     k_docs_to_retrieve: int
 ) -> RetrievalQA:
     """Builds the RAG chain."""
-    prompt_template_str = """Please use the following context to answer the question.
-If you don't know the answer from the context, explicitly state that you don't know. Do not make up an answer.
-Answer in Chinese.
-
-Context:
-{context}
-
-Question: {question}
-
-Helpful Answer:"""
+    # read prompt template from file
+    with open(settings.PROMPT_PATH, "r") as file:
+        prompt_template_str = file.read()
     
     QA_PROMPT = PromptTemplate.from_template(prompt_template_str)
 

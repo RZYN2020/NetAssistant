@@ -1,7 +1,8 @@
 import os
 from typing import List, Any, Optional
 from langchain_core.embeddings import Embeddings
-
+from langchain_community.vectorstores import FAISS
+from fastapi import HTTPException
 
 def get_vector_store(
     docs: List[Any],
@@ -15,6 +16,7 @@ def get_vector_store(
         import shutil
         shutil.rmtree(vector_db_path)
 
+    vector_store = None
     if os.path.exists(vector_db_path) and os.listdir(vector_db_path):
         print(f"Loading existing vector store from '{vector_db_path}'...")
         try:
@@ -26,15 +28,21 @@ def get_vector_store(
                 allow_dangerous_deserialization=True
             )
             print("Vector store loaded successfully.")
-            return vector_store
         except Exception as e:
             print(f"Failed to load vector store: {e}. Will attempt to recreate.")
-    
-    if not docs:
-        print("No documents provided to create a new vector store.")
-        return None
 
-    print(f"Creating new vector store at '{vector_db_path}'...")
+    if not vector_store and not len(docs) == 0:
+        print("No documents provided and no existing vector store found.")
+        return None
+    
+    if vector_store:
+        print("Existing vector store loaded.")
+        # load more documents into the existing vector store
+        if not len(docs) == 0:
+            print("Adding new documents to the existing vector store...")
+            vector_store.add_documents(docs)
+        return vector_store
+    
     try:
         vector_store = FAISS.from_documents(docs, embedding_service)
         vector_store.save_local(vector_db_path)
