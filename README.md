@@ -5,7 +5,9 @@
 
 # todo
 1. 流式响应 （以支持各种客户端）
-2. better rag（处理retirval效果不好的问题）
+2. 更多的命令行参数支持（如方便地添加增加新文档）
+   1. 也可以通过提供http接口增加文档 
+3. better rag（处理retirval效果不好的问题）
    1. 更好的数据源（好的教材以及开源文档）
    2. 更好的算法（graphrag? better embeding?...）
 4. 性能优化（更好的推理框架etc）
