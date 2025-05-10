@@ -12,6 +12,7 @@ class ChatCompletionRequest(BaseModel):
     model: Optional[str] = None # Client can specify, but server decides based on config
     messages: List[ChatMessage]
     temperature: Optional[float] = 0.7
+    stream: Optional[bool] = False
     # Add other OpenAI compatible fields if needed, though they might not all be used by all models
 
 class ChatCompletionChoice(BaseModel):

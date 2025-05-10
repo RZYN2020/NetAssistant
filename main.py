@@ -14,7 +14,7 @@ if __name__ == "__main__":
         print("Error: LLM service could not be initialized.")
         exit(1)
 
-    if settings.ADD_KNOWLEDGE:
+    if settings.RECRATE_KNOWLEDGE:
         split_docs = load_and_split_documents(
             settings.KNOWLEDGE_BASE_DIR,
             settings.CHUNK_SIZE,
@@ -27,7 +27,8 @@ if __name__ == "__main__":
 
     vector_store = get_vector_store(split_docs, 
                                     llm_service.get_embedding_model(), 
-                                    settings.VECTOR_DB_PATH)
+                                    settings.VECTOR_DB_PATH,
+                                    force_recreate=settings.RECRATE_KNOWLEDGE)
     if not vector_store:
         print("Error: Vector store could not be initialized.")
         exit(1)

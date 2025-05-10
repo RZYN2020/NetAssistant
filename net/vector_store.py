@@ -5,7 +5,7 @@ from langchain_community.vectorstores import FAISS
 from fastapi import HTTPException
 
 def get_vector_store(
-    docs: List[Any],
+    docs: List[Any], # only used for creating a new vector store
     embedding_service: Embeddings,
     vector_db_path: str,
     force_recreate: bool = False
@@ -27,22 +27,12 @@ def get_vector_store(
                 embedding_service,
                 allow_dangerous_deserialization=True
             )
-            print("Vector store loaded successfully.")
+            return vector_store
         except Exception as e:
             print(f"Failed to load vector store: {e}. Will attempt to recreate.")
 
-    if not vector_store and not len(docs) == 0:
+    if len(docs) == 0:
         print("No documents provided and no existing vector store found.")
-        return None
-    
-    if vector_store:
-        print("Existing vector store loaded.")
-        # load more documents into the existing vector store
-        if not len(docs) == 0:
-            print("Adding new documents to the existing vector store...")
-            vector_store.add_documents(docs)
-        return vector_store
-    
     try:
         vector_store = FAISS.from_documents(docs, embedding_service)
         vector_store.save_local(vector_db_path)

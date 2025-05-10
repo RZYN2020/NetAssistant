@@ -29,7 +29,7 @@ class AppSettings(BaseSettings):
 
     # Knowledge base and vector store paths
     KNOWLEDGE_BASE_DIR: str = "knowledge_base_data"
-    ADD_KNOWLEDGE: bool = False
+    RECRATE_KNOWLEDGE: bool = True
     VECTOR_DB_PATH: str = "vector_db_faiss_modular"
     
     # RAG settings

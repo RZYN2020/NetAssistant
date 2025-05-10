@@ -1,24 +1,27 @@
 import os
-from typing import Optional
-
+from typing import Optional, List
+import asyncio
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from contextlib import asynccontextmanager
-from net.api_models import ChatCompletionResponse, ChatCompletionRequest, ChatMessage, ChatCompletionChoice
+from net.api_models import (
+    ChatCompletionResponse, ChatCompletionRequest, ChatMessage, 
+    ChatCompletionChoice
+)
 from net.llm_services import BaseLLMService, get_llm_service
 from net.rag_builder import build_rag_chain, RetrievalQA
 from net.config import settings, LLMProviderEnum
 from net.vector_store import get_vector_store
-from net.document_loader import load_and_split_documents    
+from net.document_loader import load_and_split_documents
+from sse_starlette.sse import EventSourceResponse
+import json
 
-
-# Global state for initialized components
-# In a class-based structure, these would be attributes of an AppManager or similar
 class AppState:
     llm_service_instance: Optional[BaseLLMService] = None
     rag_chain_instance: Optional[RetrievalQA] = None
     is_initialized: bool = False
     effective_model_name: str = "not_initialized"
+    vector_store = None
 
 app_state = AppState()
 
@@ -36,7 +39,7 @@ async def lifespan(app: FastAPI):
         app_state.effective_model_name = app_state.llm_service_instance.get_effective_chat_model_name()
 
         # 2. Load and process documents
-        if settings.ADD_KNOWLEDGE:
+        if settings.RECRATE_KNOWLEDGE:
             split_docs = load_and_split_documents(
                 settings.KNOWLEDGE_BASE_DIR,
                 settings.CHUNK_SIZE,
@@ -47,53 +50,125 @@ async def lifespan(app: FastAPI):
             split_docs = []
 
         # 3. Create or load vector store
-        # Consider adding a config option for force_recreate_db for development
-        vector_store = get_vector_store(
+        app_state.vector_store = get_vector_store(
             split_docs,
             embedding_model,
             settings.VECTOR_DB_PATH,
-            force_recreate=False # Set to True to rebuild DB on startup
+            force_recreate=settings.RECRATE_KNOWLEDGE
         )
 
-        if not vector_store:
-            print("Error: Vector store could not be initialized. RAG chain will not be built.")
+        if not app_state.vector_store:
+            print("Error: Vector store could not be initialized.")
             app_state.is_initialized = False
-            # Optionally raise an exception here to prevent app from starting if DB is critical
-            # raise RuntimeError("Failed to initialize vector store.")
             return
-
 
         # 4. Build RAG chain
         app_state.rag_chain_instance = build_rag_chain(
             chat_model,
-            vector_store,
+            app_state.vector_store,
             settings.SEARCH_K_DOCS
         )
         
         app_state.is_initialized = True
-        print(f"RAG system initialized successfully. Effective chat model: {app_state.effective_model_name}")
+        print(f"RAG system initialized successfully.")
 
     except Exception as e:
         app_state.is_initialized = False
         print(f"FATAL: RAG system initialization failed: {e}")
-        # Depending on severity, you might want the app to not start
-        # For now, it will start but /chat/completions will fail
-        # raise # Re-raise to stop FastAPI startup on critical failure
 
-    yield  # This is where the app will run
-    # Cleanup on shutdown
+    yield
+
     print("Application shutdown: Cleaning up resources...")
-    if app_state.rag_chain_instance:
-        app_state.rag_chain_instance = None
-    if app_state.llm_service_instance:
-        app_state.llm_service_instance = None
+    app_state.rag_chain_instance = None
+    app_state.llm_service_instance = None
     app_state.is_initialized = False
     print("RAG system resources cleaned up.")
 
-# FastAPI application instance
 app = FastAPI(title="RAG TA API", version="1.0.0", lifespan=lifespan)
 
-@app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
+# Document Management APIs
+@app.post("/v1/documents/upload")
+async def upload_document(file: UploadFile = File(...)):
+    """Upload a new document to the knowledge base."""
+    if not app_state.is_initialized:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+    
+    try:
+        file_path = os.path.join(settings.KNOWLEDGE_BASE_DIR, file.filename)
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+        
+        # Process and add to vector store
+        docs = load_and_split_documents([file_path], settings.CHUNK_SIZE, settings.CHUNK_OVERLAP)
+        embedding_model = app_state.llm_service_instance.get_embedding_model()
+        app_state.vector_store.add_documents(docs, embedding_model)
+        
+        return {"status": "success", "message": f"Document {file.filename} uploaded and processed"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/v1/documents/list")
+async def list_documents():
+    """List all documents in the knowledge base."""
+    try:
+        files = os.listdir(settings.KNOWLEDGE_BASE_DIR)
+        return {
+            "documents": [
+                {
+                    "name": f,
+                    "size": os.path.getsize(os.path.join(settings.KNOWLEDGE_BASE_DIR, f))
+                }
+                for f in files if os.path.isfile(os.path.join(settings.KNOWLEDGE_BASE_DIR, f))
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/v1/documents/{document_name}")
+async def delete_document(document_name: str):
+    """Delete a document from the knowledge base."""
+    try:
+        file_path = os.path.join(settings.KNOWLEDGE_BASE_DIR, document_name)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            # Note: This is a simple implementation. In practice, you'd want to also
+            # remove the document's embeddings from the vector store
+            return {"status": "success", "message": f"Document {document_name} deleted"}
+        raise HTTPException(status_code=404, detail="Document not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/v1/rag/recreate")
+async def recreate_rag():
+    """Recreate the RAG system."""
+    if not app_state.is_initialized:
+        raise HTTPException(status_code=503, detail="Service not initialized")
+
+    try:
+        # Recreate vector store and RAG chain
+        split_docs = load_and_split_documents(
+            settings.KNOWLEDGE_BASE_DIR,
+            settings.CHUNK_SIZE,
+            settings.CHUNK_OVERLAP
+        )
+        app_state.vector_store = get_vector_store(
+            split_docs,
+            app_state.llm_service_instance.get_embedding_model(),
+            settings.VECTOR_DB_PATH,
+            force_recreate=True
+        )
+        app_state.rag_chain_instance = build_rag_chain(
+            app_state.llm_service_instance.get_chat_model(),
+            app_state.vector_store,
+            settings.SEARCH_K_DOCS
+        )
+        return {"status": "success", "message": "RAG system recreated successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/v1/chat/completions")
 async def chat_completions_endpoint(request: ChatCompletionRequest, http_req: Request):
     """Handles chat completion requests, compatible with OpenAI API format."""
     if not app_state.is_initialized or not app_state.rag_chain_instance:
@@ -104,7 +179,6 @@ async def chat_completions_endpoint(request: ChatCompletionRequest, http_req: Re
 
     user_query = None
     if request.messages:
-        # Get the last user message as the query
         for msg in reversed(request.messages):
             if msg.role == "user":
                 user_query = msg.content
@@ -116,11 +190,13 @@ async def chat_completions_endpoint(request: ChatCompletionRequest, http_req: Re
     client_ip = http_req.client.host if http_req.client else "unknown"
     print(f"Received query from {client_ip}: '{user_query[:150]}...'")
 
+    # Check if streaming is requested
+    if request.stream:
+        return EventSourceResponse(stream_response(user_query))
+
     try:
-        # Asynchronously invoke the RAG chain
         print("Invoking RAG chain...")
         rag_result = await app_state.rag_chain_instance.ainvoke({"query": user_query})
-        
         answer = rag_result.get("result", "Sorry, I could not find an answer to your question.")
         print(f"Generated answer: {answer[:150]}...")
 
@@ -130,9 +206,8 @@ async def chat_completions_endpoint(request: ChatCompletionRequest, http_req: Re
 
     response_message = ChatMessage(role="assistant", content=answer)
     choice = ChatCompletionChoice(index=0, message=response_message)
-    
-    # Determine the model name to return in the response
     response_model_name = app_state.effective_model_name
+
     if request.model:
         if (settings.LLM_PROVIDER == LLMProviderEnum.OLLAMA and "ollama" in request.model.lower()) or \
            (settings.LLM_PROVIDER == LLMProviderEnum.OPENAI and ("gpt" in request.model.lower() or "openai" in request.model.lower())):
@@ -144,6 +219,29 @@ async def chat_completions_endpoint(request: ChatCompletionRequest, http_req: Re
         model=response_model_name,
         choices=[choice]
     )
+
+async def stream_response(query: str):
+    """Generator for streaming responses."""
+    try:
+        rag_result = await app_state.rag_chain_instance.ainvoke({"query": query})
+        answer = rag_result.get("result", "Sorry, I could not find an answer to your question.")
+        
+        # Simulate streaming by sending chunks
+        chunks = [answer[i:i+10] for i in range(0, len(answer), 10)]
+        for i, chunk in enumerate(chunks):
+            response_data = {
+                "choices": [{
+                    "delta": {"content": chunk},
+                    "index": 0,
+                    "finish_reason": "stop" if i == len(chunks)-1 else None
+                }],
+                "model": app_state.effective_model_name
+            }
+            yield json.dumps(response_data)
+            await asyncio.sleep(0.1)  # Add small delay between chunks
+    except Exception as e:
+        print(f"Error during streaming: {e}")
+        yield json.dumps({"error": str(e)})
 
 @app.get("/health")
 async def health_check_endpoint():
