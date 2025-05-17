@@ -19,7 +19,7 @@ class AppSettings(BaseSettings):
 
     # Ollama settings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
+    OLLAMA_EMBEDDING_MODEL: str = "lrs33/bce-embedding-base_v1"
     OLLAMA_CHAT_MODEL: str = "deepseek-r1:1.5b"
 
     # OpenAI settings
