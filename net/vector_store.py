@@ -34,6 +34,7 @@ def get_vector_store(
     if len(docs) == 0:
         print("No documents provided and no existing vector store found.")
     try:
+        print(f"Creating new vector store at '{vector_db_path}'...")
         vector_store = FAISS.from_documents(docs, embedding_service)
         vector_store.save_local(vector_db_path)
         print("New vector store created and saved.")
