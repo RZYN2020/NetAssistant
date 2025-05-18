@@ -1,9 +1,9 @@
 from net.config import settings
 from net.vector_store import get_vector_store
-from net.llm_services import get_llm_service
+from net.llm_services import LLMServiceManager
 
 if __name__ == "__main__":
-    llm_service = get_llm_service(settings)
+    llm_service = LLMServiceManager(settings)
     embedding_service = llm_service.get_embedding_model()    
     
     # Example usage
