@@ -223,22 +223,34 @@ async def chat_completions_endpoint(request: ChatCompletionRequest, http_req: Re
 async def stream_response(query: str):
     """Generator for streaming responses."""
     try:
-        rag_result = await app_state.rag_chain_instance.ainvoke({"query": query})
-        answer = rag_result.get("result", "Sorry, I could not find an answer to your question.")
-        
-        # Simulate streaming by sending chunks
-        chunks = [answer[i:i+10] for i in range(0, len(answer), 10)]
-        for i, chunk in enumerate(chunks):
-            response_data = {
-                "choices": [{
-                    "delta": {"content": chunk},
-                    "index": 0,
-                    "finish_reason": "stop" if i == len(chunks)-1 else None
-                }],
-                "model": app_state.effective_model_name
-            }
-            yield json.dumps(response_data)
-            await asyncio.sleep(0.1)  # Add small delay between chunks
+        # Use streaming from RAG chain if available
+        async for chunk in app_state.rag_chain_instance.astream({"query": query}):
+            if isinstance(chunk, dict):
+                content = chunk.get("result", "")
+            else:
+                content = str(chunk)
+                
+            if content:
+                response_data = {
+                    "choices": [{
+                        "delta": {"content": content},
+                        "index": 0,
+                        "finish_reason": None
+                    }],
+                    "model": app_state.effective_model_name
+                }
+                yield json.dumps(response_data)
+                
+        # Send final chunk with finish_reason
+        yield json.dumps({
+            "choices": [{
+                "delta": {"content": ""},
+                "index": 0,
+                "finish_reason": "stop"
+            }],
+            "model": app_state.effective_model_name
+        })
+                
     except Exception as e:
         print(f"Error during streaming: {e}")
         yield json.dumps({"error": str(e)})
