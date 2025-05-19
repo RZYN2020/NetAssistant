@@ -224,6 +224,9 @@ class EnhancedCustomRetriever(BaseRetriever):
         return classify_query(llm, query)
     async def _async_transform_query(self, llm: BaseChatModel, query: str) -> str:
         return transform_query(llm, query)
+
+    async def _async_translate_query(self, llm: BaseChatModel, query: str) -> str:
+        return translate_query(llm, query)
     async def _async_rerank_documents(self, llm: BaseChatModel, query: str, documents: List[Document]) -> List[Document]:
         # Replace with actual async reranking logic
         return rerank_documents(llm, query, documents) # top_n for rerank_documents is different from k_after_rerank_to_summarize
