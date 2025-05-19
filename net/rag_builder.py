@@ -41,8 +41,7 @@ def transform_query(llm: BaseChatModel, query: str) -> str:
 def translate_query(llm: BaseChatModel, query: str) -> str:
     """Translates the query to the language of the documents. ch->en/en->ch"""
     translate_prompt = PromptTemplate.from_template(
-        "Translate the following query to English if it's in Chinese, or to Chinese if it's in English. "
-        "Keep the response in the same language as the input query: {query}"
+        "Translate the following query to English if it's in Chinese, or to Chinese if it's in English. ·{query}"
     )
     chain = translate_prompt | llm
     response = chain.invoke({"query": query})
