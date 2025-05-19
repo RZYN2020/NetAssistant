@@ -38,9 +38,19 @@ def transform_query(llm: BaseChatModel, query: str) -> str:
     response = chain.invoke({"query": query})
     return response.content
 
+def translate_query(llm: BaseChatModel, query: str) -> str:
+    """Translates the query to the language of the documents. ch->en/en->ch"""
+    translate_prompt = PromptTemplate.from_template(
+        "Translate the following query to English if it's in Chinese, or to Chinese if it's in English. "
+        "Keep the response in the same language as the input query: {query}"
+    )
+    chain = translate_prompt | llm
+    response = chain.invoke({"query": query})
+    return response.content
+
 def rerank_documents(llm: BaseChatModel, query: str, documents: List[Document]) -> List[Document]:
     """Re-ranks documents based on their relevance to the query using LLM scoring."""
-    print(f"DEBUG: Reranking {len(documents)} documents for query: '{query}'")
+    debug(f"Reranking {len(documents)} documents for query: '{query}'")
     if not documents:
         return []
 
@@ -155,11 +165,19 @@ class EnhancedCustomRetriever(BaseRetriever):
         # 2. Transform Query
         transformed_query = await self._async_transform_query(self.llm, query)
         debug(f"Transformed query: '{transformed_query}'")
+        
+        # 3. Translate Query
+        translated_query = await self._async_translate_query(self.llm, transformed_query)
+        debug(f"Translated query: '{translated_query}'")
 
-        # 3. Retrieve Initial Documents
-        initial_docs = await self.base_retriever.aget_relevant_documents(
+        # 4. Retrieve Initial Documents
+        initial_docs_1 = await self.base_retriever.aget_relevant_documents(
             transformed_query, callbacks=run_manager.get_child(), **kwargs
         )
+        initial_docs_2 = await self.base_retriever.aget_relevant_documents(
+            translated_query, callbacks=run_manager.get_child(), **kwargs
+        )
+        initial_docs = initial_docs_1 + initial_docs_2
         debug(f"Retrieved {len(initial_docs)} initial documents after transformation.")
         if not initial_docs:
             return []
