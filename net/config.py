@@ -14,9 +14,9 @@ class AppSettings(BaseSettings):
 
     # Ollama settings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_HELP_MODEL: str = "deepseek-r1:1.5b"
+    OLLAMA_HELP_MODEL: str = "qwen2.5:1.5b"
     OLLAMA_EMBEDDING_MODEL: str = "nomic-embed-text"
-    OLLAMA_CHAT_MODELS: List[str] = ["deepseek-r1:1.5b"]
+    OLLAMA_CHAT_MODELS: List[str] = ["deepseek-r1:7b", "deepseek-r1:14b", "deepseek-r1:32b"]
     OLLAMA_ENABLE: bool = True
 
     # Knowledge base and vector store paths

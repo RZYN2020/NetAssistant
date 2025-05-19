@@ -2,7 +2,7 @@
 
 # 定义端口和日志文件名
 PORT=8000
-PYTHON_SCRIPT="serve.py"
+PYTHON_SCRIPT="main.py"
 LOG_FILE="nohup.log"
 APP_COMMAND="python ${PYTHON_SCRIPT}" # 如果你用python3, 请改成 python3 ${PYTHON_SCRIPT}
 

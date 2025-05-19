@@ -160,7 +160,7 @@ class EnhancedCustomRetriever(BaseRetriever):
         initial_docs = await self.base_retriever.aget_relevant_documents(
             transformed_query, callbacks=run_manager.get_child(), **kwargs
         )
-        print(f"DEBUG: Retrieved {len(initial_docs)} initial documents after transformation.")
+        debug(f"Retrieved {len(initial_docs)} initial documents after transformation.")
         if not initial_docs:
             return []
 
@@ -171,13 +171,13 @@ class EnhancedCustomRetriever(BaseRetriever):
         
         # Select top N documents after re-ranking
         docs_to_summarize = reranked_docs[:settings.TOP_K]
-        print(f"DEBUG: Selected top {len(docs_to_summarize)} re-ranked documents for summarization.")
+        debug(f"Selected top {len(docs_to_summarize)} re-ranked documents for summarization.")
 
         # 5. Summarize Selected Documents
         doc_page_contents = [doc.page_content for doc in docs_to_summarize]
         summarized_contents = await self._async_summarize_documents(self.llm, doc_page_contents)
         if not summarized_contents:
-            print("DEBUG: No summaries generated.")
+            debug("No summaries generated.")
             return []
 
         # 6. Package Summaries into Document objects
@@ -194,7 +194,8 @@ class EnhancedCustomRetriever(BaseRetriever):
                     metadata=final_metadata
                 )
             )
-        print(f"DEBUG: Returning {len(final_documents)} summarized and packaged documents to the RAG chain.")
+        debug(f"Returning {len(final_documents)} summarized and packaged documents to the RAG chain.")
+        debug(f"final_documents:\n{final_documents}")
         return final_documents
 
 
