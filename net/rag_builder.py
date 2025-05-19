@@ -179,6 +179,7 @@ class EnhancedCustomRetriever(BaseRetriever):
         )
         initial_docs = initial_docs_1 + initial_docs_2
         debug(f"Retrieved {len(initial_docs)} initial documents after transformation.")
+        debug(f"initial_docs:\n{initial_docs}")
         if not initial_docs:
             return []
 
