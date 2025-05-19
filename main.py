@@ -57,6 +57,7 @@ app = FastAPI(title="RAG TA API", version="1.0.0", lifespan=lifespan)
 async def list_models():
     """List available models, mimicking OpenAI's API format."""
     model_ids = rag.get_models()
+    model_ids = ["rag-" + model_id for model_id in model_ids]
     return {
         "object": "list",
         "data": [
@@ -87,8 +88,9 @@ async def list_models():
 async def chat_completions(request: ChatCompletionRequest, http_req: Request):
     """Handles chat completion requests, compatible with OpenAI API format."""
     
+    request_model = request.model[4:] if request.model else None
     models = rag.get_models()
-    if request.model not in models:
+    if request_model not in models:
         raise HTTPException(status_code=400, detail=f"Model '{request.model}' not found.")
 
     user_query = next((msg.content for msg in reversed(request.messages) 
@@ -100,10 +102,10 @@ async def chat_completions(request: ChatCompletionRequest, http_req: Request):
     print(f"Received query from {client_ip}: '{user_query[:150]}...'")
 
     if request.stream:
-        return EventSourceResponse(stream_response(user_query, request.model))
+        return EventSourceResponse(stream_response(user_query, request_model))
     else:
         try:
-            rag_result = await rag.invoke(request.model, user_query)
+            rag_result = await rag.invoke(request_model, user_query)
             answer = rag_result.get("result", "Sorry, I could not find an answer to your question.")
         except Exception as e:
             print(f"Error during RAG chain invocation: {e}")
