@@ -128,7 +128,6 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
 .venv
 env/
 venv/
@@ -177,3 +176,4 @@ cython_debug/
 vector_db_faiss_modular/
 .conda
 .vscode
+.idea

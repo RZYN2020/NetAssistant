@@ -41,6 +41,7 @@ frozenlist==1.6.0
 fsspec==2025.3.2
 future==1.0.0
 gensim==4.3.3
+graphrag==2.2.1
 graphrag-more==1.2.0
 graspologic==3.4.1
 graspologic-native==1.2.5
